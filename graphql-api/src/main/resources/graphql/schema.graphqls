@@ -1,0 +1,50 @@
+type Query {
+    # Liste de tous les utilisateurs (protégé par JWT)
+    getAllUsers: [User!]!
+
+    # Récupérer un utilisateur par ID
+    getUserById(id: ID!): User
+
+    # Récupérer l'utilisateur connecté
+    me: User
+}
+
+type Mutation {
+    # Inscription d'un nouvel utilisateur
+    register(input: RegisterInput!): AuthResponse!
+
+    # Connexion d'un utilisateur
+    login(input: LoginInput!): AuthResponse!
+}
+
+# Entité utilisateur
+type User {
+    id: ID!
+    nom: String!
+    prenom: String!
+    email: String!
+    role: String!
+    createdAt: String!
+}
+
+# Réponse d'authentification
+type AuthResponse {
+    token: String!
+    user: User!
+    message: String!
+}
+
+# Input pour l'inscription
+input RegisterInput {
+    nom: String!
+    prenom: String!
+    email: String!
+    motDePasse: String!
+    role: String
+}
+
+# Input pour la connexion
+input LoginInput {
+    email: String!
+    motDePasse: String!
+}

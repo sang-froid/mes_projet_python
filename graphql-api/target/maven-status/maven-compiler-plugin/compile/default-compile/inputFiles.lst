@@ -1,0 +1,13 @@
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\dto\LoginInput.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\dto\RegisterInput.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\security\JwtAuthFilter.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\resolver\UserResolver.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\dto\UserDto.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\GraphqlApiApplication.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\dto\AuthResponse.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\repository\UserRepository.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\security\JwtService.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\service\UserService.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\entity\User.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\config\SecurityConfig.java
+C:\Users\Iwaju Tech\Documents\GitHub\irene\graphql-api\src\main\java\com\app\config\GraphQlExceptionHandler.java
