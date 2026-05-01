@@ -1,0 +1,31 @@
+destId,name,region,tagline,continent,tags,unsplash_query
+1,Bali,Indonésie,Plages & temples,Asia,beach|culture|nature|wellness,bali indonesia temple
+2,Thaïlande,Bangkok & Phuket,Street food & îles,Asia,beach|culture|food|adventure,thailand beach tropical
+3,Japon,Tokyo & Kyoto,Culture & technologie,Asia,culture|food|city|nature,japan tokyo kyoto
+4,Islande,Reykjavik,Aurores boréales,Europe,nature|adventure|landscape,iceland aurora northern lights
+5,Norvège,Fjords,Paysages épiques,Europe,nature|adventure|landscape,norway fjord landscape
+6,Vietnam,Hanoï & Hoi An,Histoire & nature,Asia,culture|food|nature|beach,vietnam hanoi lanterns
+7,Maroc,Marrakech & Sahara,Désert & médina,Africa,culture|adventure|food,morocco marrakech desert
+8,Grèce,Santorin & Athènes,Mer & antiquité,Europe,beach|culture|food|city,greece santorini sunset
+9,Portugal,Lisbonne & Porto,Villes & atlantique,Europe,city|culture|food|beach,portugal lisbon tiles
+10,Mexique,Cancun & Mexico,Plages & pyramides,Americas,beach|culture|food|adventure,mexico cancun beach pyramid
+11,Pérou,Machu Picchu,Randonnée & Inca,Americas,adventure|culture|nature|landscape,peru machu picchu inca
+12,Costa Rica,San José,Jungle & volcans,Americas,nature|adventure|wildlife,costa rica jungle volcano
+13,Maldives,Atoll Nord,Lagon & plongée,Asia,beach|wellness|nature,maldives overwater bungalow
+14,Tanzanie,Serengeti & Zanzibar,Safari & plages,Africa,wildlife|adventure|beach|nature,tanzania safari serengeti
+15,Islande,Sud & Snaefellsnes,Glaciers & geysers,Europe,nature|landscape|adventure,iceland glacier geyser
+16,Nouvelle-Zélande,Auckland & Queenstown,Aventure extrême,Oceania,adventure|nature|landscape,new zealand queenstown adventure
+17,Australie,Sydney & Uluru,Villes & outback,Oceania,city|nature|beach|wildlife,australia sydney opera uluru
+18,Émirats Arabes Unis,Dubaï,Luxe & modernité,Asia,city|luxury|culture,dubai luxury skyline
+19,Italie,Rome & Amalfi,Art & gastronomie,Europe,culture|food|city|beach,italy rome amalfi coast
+20,Espagne,Barcelone & Andalousie,Fiestas & soleil,Europe,city|culture|food|beach,spain barcelona sagrada familia
+21,France,Paris & Provence,Romantisme & vin,Europe,city|culture|food,france paris eiffel
+22,Suisse,Alpes & Genève,Ski & lacs,Europe,nature|adventure|landscape|city,switzerland alps lake
+23,Écosse,Highlands & Édimbourg,Châteaux & landes,Europe,nature|culture|landscape|adventure,scotland highlands castle
+24,Canada,Banff & Vancouver,Nature sauvage,Americas,nature|adventure|landscape|city,canada banff rocky mountains
+25,Inde,Rajasthan & Kerala,Palais & épices,Asia,culture|food|adventure|nature,india rajasthan palace
+26,Cambodge,Angkor Vat,Temples & histoire,Asia,culture|adventure|nature,cambodia angkor wat temple
+27,Sri Lanka,Colombo & Ella,Thé & éléphants,Asia,nature|culture|wildlife|beach,sri lanka tea plantation elephant
+28,Jordanie,Pétra & Wadi Rum,Désert & rose-red city,Asia,culture|adventure|landscape,jordan petra rose red city
+29,Colombie,Cartagena & Medellin,Caraïbes & cafés,Americas,city|beach|culture|food,colombia cartagena colorful
+30,Cuba,La Havane & Varadero,Musique & plages,Americas,culture|beach|city|food,cuba havana classic cars

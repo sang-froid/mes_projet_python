@@ -1,28 +1,17 @@
 """
 Item-Item Collaborative Filtering Engine
-Système de recommandation basé sur la similarité cosinus entre items.
+Le système prend le profil de notes d'un nouvel utilisateur,
+calcule les prédictions et explique pourquoi chaque film est recommandé.
 """
 
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import LabelEncoder
 import warnings
 warnings.filterwarnings("ignore")
 
 
 class ItemItemRecommender:
-    """
-    Filtrage collaboratif item-item avec similarité cosinus.
-
-    Pipeline:
-    1. Construire la matrice utilisateur-item (ratings)
-    2. Centrer les notes par utilisateur (mean-centered)
-    3. Calculer la similarité cosinus entre tous les items
-    4. Prédire la note d'un item pour un utilisateur via agrégation pondérée
-    5. Retourner le Top-N items recommandés
-    """
-
     def __init__(self, k_neighbors: int = 20):
         self.k = k_neighbors
         self.user_item_matrix = None
@@ -30,222 +19,189 @@ class ItemItemRecommender:
         self.movies_df = None
         self.ratings_df = None
         self.mean_ratings = None
-        self.centered_matrix = None
         self._is_fitted = False
 
-    # ------------------------------------------------------------------
-    # Fit
-    # ------------------------------------------------------------------
-
     def fit(self, ratings_df: pd.DataFrame, movies_df: pd.DataFrame):
-        """Entraîne le modèle sur les données de ratings."""
         self.ratings_df = ratings_df.copy()
         self.movies_df = movies_df.copy()
 
-        # Matrice utilisateur-item (lignes = users, colonnes = items)
         self.user_item_matrix = ratings_df.pivot_table(
             index="userId", columns="movieId", values="rating"
         )
-
-        # Centrage par utilisateur (soustraction de la moyenne)
         self.mean_ratings = self.user_item_matrix.mean(axis=1)
-        self.centered_matrix = self.user_item_matrix.sub(self.mean_ratings, axis=0).fillna(0)
+        centered = self.user_item_matrix.sub(self.mean_ratings, axis=0).fillna(0)
 
-        # Similarité cosinus entre items  (transposée : items en lignes)
-        item_vectors = self.centered_matrix.T.values
-        sim_matrix = cosine_similarity(item_vectors)
-
+        sim_matrix = cosine_similarity(centered.T.values)
         self.item_similarity = pd.DataFrame(
             sim_matrix,
             index=self.user_item_matrix.columns,
             columns=self.user_item_matrix.columns,
         )
-
         self._is_fitted = True
         return self
 
-    # ------------------------------------------------------------------
-    # Prédiction d'une note
-    # ------------------------------------------------------------------
-
-    def predict_rating(self, user_id: int, movie_id: int) -> dict:
+    def predict_for_user_profile(self, user_ratings: dict, n: int = 10) -> list:
         """
-        Prédit la note qu'un utilisateur donnerait à un film.
-        
-        Formule (Sarwar et al., 2001) :
-            pred(u, i) = mean(u) + Σ sim(i,j) * (r(u,j) - mean(u))
-                                   ─────────────────────────────────
-                                        Σ |sim(i,j)|
+        user_ratings : {movie_id: rating}
+        Retourne Top-N films non vus avec prédiction + double explication.
         """
-        if not self._is_fitted:
-            raise RuntimeError("Le modèle n'est pas encore entraîné.")
+        if not self._is_fitted or not user_ratings:
+            return []
 
-        if movie_id not in self.user_item_matrix.columns:
-            return {"error": "Film inconnu dans le modèle."}
+        rated_ids = set(user_ratings.keys())
+        user_mean = float(np.mean(list(user_ratings.values())))
 
-        if user_id not in self.user_item_matrix.index:
-            return {"error": "Utilisateur inconnu dans le modèle."}
-
-        # Notes déjà données par l'utilisateur
-        user_ratings = self.user_item_matrix.loc[user_id].dropna()
-
-        # Similarités du film cible avec tous les films notés par l'user
-        sims = self.item_similarity[movie_id]
-        rated_sims = sims[user_ratings.index].drop(index=movie_id, errors="ignore")
-
-        # Sélection des k meilleurs voisins (similarité positive)
-        top_sims = rated_sims[rated_sims > 0].nlargest(self.k)
-
-        if top_sims.empty:
-            # Fallback : moyenne globale du film
-            movie_mean = self.user_item_matrix[movie_id].mean()
-            return {
-                "prediction": round(float(movie_mean), 2),
-                "method": "fallback_mean",
-                "n_neighbors": 0,
-                "neighbors": [],
-            }
-
-        user_mean = self.mean_ratings[user_id]
-        neighbor_ratings = user_ratings[top_sims.index]
-        centered_neighbor = neighbor_ratings - user_mean
-
-        numerator = (top_sims * centered_neighbor).sum()
-        denominator = top_sims.abs().sum()
-
-        prediction = user_mean + (numerator / denominator)
-        prediction = float(np.clip(prediction, 1.0, 5.0))
-
-        neighbors_info = []
-        for mid, sim in top_sims.items():
-            title = self._get_title(mid)
-            neighbors_info.append({
-                "movieId": int(mid),
-                "title": title,
-                "similarity": round(float(sim), 4),
-                "user_rating": round(float(user_ratings[mid]), 1),
-            })
-
-        return {
-            "prediction": round(prediction, 2),
-            "method": "item_item_cf",
-            "n_neighbors": len(top_sims),
-            "neighbors": neighbors_info,
-            "user_mean": round(float(user_mean), 2),
-        }
-
-    # ------------------------------------------------------------------
-    # Top-N recommandations
-    # ------------------------------------------------------------------
-
-    def recommend_top_n(self, user_id: int, n: int = 10) -> pd.DataFrame:
-        """
-        Retourne les N films les mieux notés que l'utilisateur n'a pas encore vus.
-        """
-        if not self._is_fitted:
-            raise RuntimeError("Le modèle n'est pas encore entraîné.")
-
-        if user_id not in self.user_item_matrix.index:
-            return pd.DataFrame()
-
-        # Films déjà notés
-        already_rated = self.user_item_matrix.loc[user_id].dropna().index.tolist()
-
-        # Films candidats
         candidates = [
             mid for mid in self.user_item_matrix.columns
-            if mid not in already_rated
+            if mid not in rated_ids
         ]
 
         results = []
         for movie_id in candidates:
-            pred = self.predict_rating(user_id, movie_id)
-            if "error" not in pred:
-                results.append({
-                    "movieId": movie_id,
-                    "title": self._get_title(movie_id),
-                    "genres": self._get_genres(movie_id),
-                    "predicted_rating": pred["prediction"],
-                    "n_neighbors": pred["n_neighbors"],
-                })
+            if movie_id not in self.item_similarity.columns:
+                continue
 
-        if not results:
-            return pd.DataFrame()
+            sims = self.item_similarity[movie_id]
+            seen_sims = {
+                mid: float(sims[mid])
+                for mid in rated_ids
+                if mid in sims.index and sims[mid] > 0
+            }
+            if not seen_sims:
+                continue
 
-        df = pd.DataFrame(results).sort_values("predicted_rating", ascending=False)
-        return df.head(n).reset_index(drop=True)
+            top_k = sorted(seen_sims.items(), key=lambda x: x[1], reverse=True)[: self.k]
+            num = sum(sim * (user_ratings[mid] - user_mean) for mid, sim in top_k)
+            den = sum(abs(sim) for _, sim in top_k)
+            if den == 0:
+                continue
 
-    # ------------------------------------------------------------------
-    # Similarité entre items
-    # ------------------------------------------------------------------
+            pred = float(np.clip(user_mean + num / den, 1.0, 5.0))
 
-    def get_similar_items(self, movie_id: int, n: int = 10) -> pd.DataFrame:
-        """Retourne les N films les plus similaires à un film donné."""
+            best_seen = top_k[:3]
+            expl_item = self._build_item_explanation(best_seen, user_ratings)
+            expl_user, sim_users = self._build_user_explanation(movie_id, user_ratings)
+
+            results.append({
+                "movieId": int(movie_id),
+                "title": self._get_title(movie_id),
+                "genres": self._get_genres(movie_id),
+                "predicted_rating": round(pred, 2),
+                "n_neighbors": len(top_k),
+                "top_similar_seen": [
+                    {
+                        "movieId": int(mid),
+                        "title": self._get_title(mid),
+                        "similarity": round(float(sim), 3),
+                        "your_rating": user_ratings[mid],
+                    }
+                    for mid, sim in best_seen
+                ],
+                "explanation_item": expl_item,
+                "explanation_user": expl_user,
+                "similar_users_info": sim_users,
+            })
+
+        results.sort(key=lambda x: x["predicted_rating"], reverse=True)
+        return results[:n]
+
+    def _build_item_explanation(self, top_k_seen, user_ratings):
+        parts = []
+        for mid, sim in top_k_seen[:2]:
+            title = self._get_title(mid)
+            r = user_ratings[mid]
+            sentiment = "adoré" if r >= 4.5 else ("bien aimé" if r >= 3.5 else "vu")
+            parts.append((title, sim, r, sentiment))
+        if not parts:
+            return ""
+        if len(parts) == 1:
+            t, s, r, sent = parts[0]
+            return f"Très similaire à **{t}** que tu as {sent} ({r}★, sim. {s:.2f})"
+        (t1, s1, r1, sent1), (t2, s2, r2, sent2) = parts
+        return (
+            f"Similaire à **{t1}** (tu as {sent1} · {r1}★) "
+            f"et **{t2}** (tu as {sent2} · {r2}★)"
+        )
+
+    def _build_user_explanation(self, movie_id: int, user_ratings: dict):
+        rated_ids = list(user_ratings.keys())
+        candidates_users = []
+
+        for uid in self.user_item_matrix.index:
+            row = self.user_item_matrix.loc[uid]
+            common = [m for m in rated_ids if m in row.index and not np.isnan(row.get(m, np.nan))]
+            if len(common) < 2:
+                continue
+            if movie_id not in row.index or np.isnan(row.get(movie_id, np.nan)):
+                continue
+
+            vec_new = np.array([user_ratings[m] for m in common], dtype=float)
+            vec_db = np.array([row[m] for m in common], dtype=float)
+            norm_new = np.linalg.norm(vec_new)
+            norm_db = np.linalg.norm(vec_db)
+            if norm_new == 0 or norm_db == 0:
+                continue
+
+            sim = float(np.dot(vec_new, vec_db) / (norm_new * norm_db))
+            candidates_users.append({
+                "userId": uid,
+                "similarity": round(sim, 3),
+                "their_rating": round(float(row[movie_id]), 1),
+                "common_titles": [self._get_title(m) for m in common[:3]],
+                "n_common": len(common),
+            })
+
+        if not candidates_users:
+            return "", []
+
+        candidates_users.sort(key=lambda x: x["similarity"], reverse=True)
+        top_users = candidates_users[:6]
+        avg_rating = round(float(np.mean([u["their_rating"] for u in top_users])), 2)
+        n = len(top_users)
+
+        all_titles = []
+        for u in top_users[:3]:
+            all_titles += u["common_titles"]
+        rep = list(dict.fromkeys(all_titles))[:3]
+        rep_str = " et ".join(f"**{t}**" for t in rep)
+
+        expl = (
+            f"{n} utilisateur{'s' if n > 1 else ''} qui ont aussi aimé {rep_str} "
+            f"ont donné en moyenne **{avg_rating}★** à ce film"
+        )
+        return expl, top_users
+
+    def get_similar_items(self, movie_id: int, n: int = 8) -> pd.DataFrame:
         if movie_id not in self.item_similarity.columns:
             return pd.DataFrame()
-
         sims = self.item_similarity[movie_id].drop(index=movie_id, errors="ignore")
         top = sims.nlargest(n)
-
-        rows = []
-        for mid, sim in top.items():
-            rows.append({
-                "movieId": int(mid),
-                "title": self._get_title(mid),
-                "genres": self._get_genres(mid),
-                "similarity": round(float(sim), 4),
-            })
-        return pd.DataFrame(rows)
-
-    # ------------------------------------------------------------------
-    # Matrice de similarité (pour visualisation heatmap)
-    # ------------------------------------------------------------------
+        return pd.DataFrame([
+            {"movieId": int(m), "title": self._get_title(m),
+             "genres": self._get_genres(m), "similarity": round(float(s), 4)}
+            for m, s in top.items()
+        ])
 
     def get_similarity_submatrix(self, movie_ids: list) -> pd.DataFrame:
-        """Retourne la sous-matrice de similarité pour une liste de films."""
         valid = [m for m in movie_ids if m in self.item_similarity.columns]
         titles = {m: self._get_title(m) for m in valid}
-        sub = self.item_similarity.loc[valid, valid]
+        sub = self.item_similarity.loc[valid, valid].copy()
         sub.index = [titles[m] for m in valid]
         sub.columns = [titles[m] for m in valid]
         return sub
 
-    # ------------------------------------------------------------------
-    # Statistiques & utilitaires
-    # ------------------------------------------------------------------
-
-    def get_user_stats(self, user_id: int) -> dict:
-        if user_id not in self.user_item_matrix.index:
-            return {}
-        user_row = self.user_item_matrix.loc[user_id].dropna()
-        return {
-            "n_ratings": len(user_row),
-            "mean_rating": round(float(user_row.mean()), 2),
-            "min_rating": float(user_row.min()),
-            "max_rating": float(user_row.max()),
-            "rated_movies": user_row.sort_values(ascending=False),
-        }
-
-    def get_movie_stats(self, movie_id: int) -> dict:
-        if movie_id not in self.user_item_matrix.columns:
-            return {}
-        col = self.user_item_matrix[movie_id].dropna()
-        return {
-            "n_ratings": len(col),
-            "mean_rating": round(float(col.mean()), 2),
-            "std_rating": round(float(col.std()), 2),
-        }
-
     def get_all_movies(self) -> pd.DataFrame:
         return self.movies_df.copy()
 
-    def get_all_users(self) -> list:
-        return sorted(self.user_item_matrix.index.tolist())
-
-    def get_sparsity(self) -> float:
-        total = self.user_item_matrix.shape[0] * self.user_item_matrix.shape[1]
-        filled = self.user_item_matrix.notna().sum().sum()
-        return round(1 - filled / total, 4)
+    def get_global_stats(self) -> dict:
+        return {
+            "n_users": self.user_item_matrix.shape[0],
+            "n_movies": self.user_item_matrix.shape[1],
+            "n_ratings": int(self.user_item_matrix.notna().sum().sum()),
+            "mean_rating": round(float(self.ratings_df["rating"].mean()), 2),
+            "sparsity": round(1 - self.user_item_matrix.notna().sum().sum() /
+                              (self.user_item_matrix.shape[0] * self.user_item_matrix.shape[1]), 4),
+        }
 
     def _get_title(self, movie_id: int) -> str:
         row = self.movies_df[self.movies_df["movieId"] == movie_id]

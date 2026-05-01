@@ -1,220 +1,153 @@
 """
-CineMatch — Système de Recommandation Collaboratif (Item-Item)
-TP1 — Filtrage Collaboratif avec MovieLens
+CineMatch — TP1 Filtrage Collaboratif Item-Item
+Interface : profil utilisateur → recommandations expliquées + bouton Regarder
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
-
+from urllib.parse import quote
 from recommender import ItemItemRecommender
 
-# ─────────────────────────────────────────────
-# CONFIG PAGE
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="CineMatch · RecSys",
+    page_title="CineMatch · RecSys TP1",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────
-# STYLE
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────
+# STYLES
+# ─────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-}
+html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
+.stApp { background: #080810; color: #ddd8ce; }
 
-/* Background */
-.stApp {
-    background: #0a0a0f;
-    color: #e8e4dc;
-}
-
-/* Sidebar */
 section[data-testid="stSidebar"] {
-    background: #0f0f18 !important;
-    border-right: 1px solid #1e1e2e;
+    background: #0c0c18 !important;
+    border-right: 1px solid #181828;
 }
-section[data-testid="stSidebar"] * { color: #c8c4bc !important; }
+section[data-testid="stSidebar"] * { color: #aaa8b0 !important; }
+h1,h2,h3,h4 { font-family:'Syne',sans-serif !important; letter-spacing:-.02em; }
 
-/* Headings */
-h1, h2, h3 { font-family: 'Syne', sans-serif !important; }
-
-/* Cards */
 .card {
-    background: #12121c;
-    border: 1px solid #1e1e2e;
-    border-radius: 16px;
-    padding: 24px 28px;
-    margin-bottom: 16px;
+    background:#10101e; border:1px solid #1c1c30;
+    border-radius:14px; padding:22px 24px; margin-bottom:14px;
+}
+.card-hot { border-color:#d4501e; box-shadow:0 0 28px rgba(212,80,30,.10); }
+
+.mbox { background:#14141f; border:1px solid #202030; border-radius:10px; padding:14px 16px; text-align:center; }
+.mval { font-family:'Syne',sans-serif; font-size:2rem; font-weight:800; color:#d4501e; line-height:1; }
+.mlbl { font-size:.72rem; color:#60607a; text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+
+.gtag {
+    display:inline-block; background:#18182c; border:1px solid #28283c;
+    border-radius:999px; padding:2px 10px;
+    font-size:.72rem; color:#8080a0; margin:2px 2px;
 }
 
-.card-accent {
-    border-color: #e05c2a;
-    box-shadow: 0 0 24px rgba(224, 92, 42, 0.12);
+/* ── Watch button ───────────────────────────── */
+.watch-btn {
+    display:inline-flex; align-items:center; gap:6px;
+    background:#d4501e; color:#fff !important;
+    border-radius:8px; padding:6px 14px;
+    font-family:'Syne',sans-serif; font-size:.8rem; font-weight:700;
+    text-decoration:none !important;
+    transition:background .15s;
+    margin-top:6px;
+}
+.watch-btn:hover { background:#b84218; color:#fff !important; }
+
+.watch-btn-sm {
+    display:inline-flex; align-items:center; gap:5px;
+    background:#1e1e10; border:1px solid #d4501e; color:#d4501e !important;
+    border-radius:6px; padding:3px 10px;
+    font-size:.75rem; font-weight:700; font-family:'Syne',sans-serif;
+    text-decoration:none !important;
+    transition:all .15s;
+}
+.watch-btn-sm:hover { background:#d4501e; color:#fff !important; }
+
+/* ── Film chips ─────────────────────────────── */
+.film-chip {
+    background:#14141f; border:1px solid #202030; border-radius:10px;
+    padding:10px 14px; margin-bottom:8px;
+}
+.chip-title { font-size:.85rem; color:#ccc8c4; }
+.chip-genre { font-size:.7rem; color:#50507a; }
+
+/* ── Reco card ──────────────────────────────── */
+.reco-score {
+    font-family:'Syne',sans-serif;
+    font-size:2.2rem; font-weight:800;
+    color:#d4501e; line-height:1;
+}
+.expl-box {
+    background:#0e0e1c; border-left:3px solid #d4501e;
+    border-radius:0 8px 8px 0; padding:10px 14px;
+    margin-top:10px; font-size:.82rem; color:#9090a8; line-height:1.5;
+}
+.expl-label {
+    font-size:.68rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.1em;
+    color:#d4501e; margin-bottom:3px;
 }
 
-/* Metric custom */
-.metric-box {
-    background: #16161f;
-    border: 1px solid #272737;
-    border-radius: 12px;
-    padding: 18px 20px;
-    text-align: center;
-}
-.metric-val {
-    font-family: 'Syne', sans-serif;
-    font-size: 2.1rem;
-    font-weight: 800;
-    color: #e05c2a;
-    line-height: 1.1;
-}
-.metric-label {
-    font-size: 0.78rem;
-    color: #7a7a8c;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-top: 4px;
-}
-
-/* Tag genre */
-.genre-tag {
-    display: inline-block;
-    background: #1e1e30;
-    border: 1px solid #2e2e48;
-    border-radius: 999px;
-    padding: 3px 12px;
-    font-size: 0.75rem;
-    color: #9090b0;
-    margin: 2px 2px;
-}
-
-/* Star rating */
-.stars { color: #e05c2a; font-size: 1.2rem; }
-
-/* Page header */
-.page-header {
-    padding: 12px 0 28px 0;
-    border-bottom: 1px solid #1e1e2e;
-    margin-bottom: 32px;
-}
-.page-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.9rem;
-    font-weight: 800;
-    color: #f0ece4;
-    margin: 0;
-}
-.page-sub {
-    color: #6a6a7c;
-    font-size: 0.88rem;
-    margin-top: 4px;
-}
-
-/* Prediction big */
-.pred-score {
-    font-family: 'Syne', sans-serif;
-    font-size: 4rem;
-    font-weight: 800;
-    color: #e05c2a;
-    line-height: 1;
-}
-
-/* Table override */
-.dataframe { background: #12121c !important; }
-
-/* Selectbox, sliders */
-.stSelectbox > div, .stSlider > div { color: #e8e4dc !important; }
-
-/* Plotly transparent bg */
-.js-plotly-plot { border-radius: 12px; overflow: hidden; }
-
-/* Neighbor row */
-.neighbor-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid #1a1a28;
-}
-.neighbor-rank {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.75rem;
-    color: #e05c2a;
-    width: 28px;
-    font-weight: 700;
-}
-.neighbor-title { flex: 1; font-size: 0.88rem; color: #d0cccc; }
-.neighbor-sim {
-    font-size: 0.82rem;
-    color: #9090a8;
-    width: 60px;
-    text-align: right;
-}
-.neighbor-rating {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #e05c2a;
-    width: 36px;
-    text-align: right;
-}
-
-/* Logo banner */
-.logo-banner {
-    font-family: 'Syne', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: #f0ece4;
-    letter-spacing: -0.02em;
-}
-.logo-accent { color: #e05c2a; }
+.stars { color:#d4501e; }
 
 .stButton>button {
-    background: #e05c2a !important;
-    color: #fff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 600 !important;
-    padding: 0.5rem 1.4rem !important;
+    background:#d4501e !important; color:#fff !important;
+    border:none !important; border-radius:8px !important;
+    font-family:'Syne',sans-serif !important; font-weight:700 !important;
+    padding:.45rem 1.4rem !important; transition:background .15s !important;
 }
-.stButton>button:hover {
-    background: #c44d20 !important;
-}
+.stButton>button:hover { background:#b84218 !important; }
 
-hr { border-color: #1e1e2e !important; }
-
-.info-pill {
-    background: #1a1a2e;
-    border: 1px solid #2a2a3e;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 0.8rem;
-    color: #8080a0;
-    display: inline-block;
+.stTabs [data-baseweb="tab"] {
+    font-family:'Syne',sans-serif !important; font-weight:700 !important; color:#6a6a80 !important;
 }
+.stTabs [aria-selected="true"] { color:#d4501e !important; }
+
+.logo { font-family:'Syne',sans-serif; font-size:1.3rem; font-weight:800; color:#f0ece4; }
+.logo-dot { color:#d4501e; }
+
+.ph { padding:8px 0 24px; border-bottom:1px solid #181828; margin-bottom:28px; }
+.ph-title { font-family:'Syne',sans-serif; font-size:1.8rem; font-weight:800; color:#f0ece4; }
+.ph-sub { font-size:.84rem; color:#50507a; margin-top:4px; }
+
+hr { border-color:#181828 !important; }
+
+.nb-row {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 0; border-bottom:1px solid #181828; font-size:.82rem;
+}
+.nb-title { flex:1; color:#b0acb4; }
+.nb-sim { width:56px; text-align:right; color:#606080; }
+.nb-rat { width:36px; text-align:right; color:#d4501e; font-weight:700; font-family:'Syne',sans-serif; }
+
+.pbar-wrap { background:#181828; border-radius:4px; height:5px; overflow:hidden; margin-top:4px; }
+.pbar-fill { background:#d4501e; height:100%; border-radius:4px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# DATA & MODEL LOADING (cached)
-# ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────
+# DONNÉES & MODÈLE
+# ─────────────────────────────────────────────────────────
 DATA_DIR = Path(__file__).parent / "data"
 
 @st.cache_data
 def load_data():
     ratings = pd.read_csv(DATA_DIR / "ratings.csv")
-    movies = pd.read_csv(DATA_DIR / "movies.csv")
+    movies  = pd.read_csv(DATA_DIR / "movies.csv")
     return ratings, movies
 
 @st.cache_resource
@@ -224,474 +157,406 @@ def load_model(k):
     model.fit(ratings, movies)
     return model
 
-# ─────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────
-def stars(rating: float) -> str:
-    full = int(rating // 1)
-    half = 1 if (rating % 1) >= 0.5 else 0
+def stars(r: float) -> str:
+    full  = int(r)
+    half  = 1 if (r % 1) >= 0.5 else 0
     empty = 5 - full - half
     return "★" * full + "½" * half + "☆" * empty
 
-def genre_tags(genres_str: str) -> str:
-    tags = genres_str.split("|") if genres_str else []
-    return " ".join([f'<span class="genre-tag">{g}</span>' for g in tags])
+def genre_tags(g: str) -> str:
+    return " ".join(f'<span class="gtag">{t}</span>' for t in g.split("|")) if g else ""
 
-def rating_bar(val: float, max_val: float = 5.0) -> str:
-    pct = val / max_val * 100
-    return f"""
-    <div style="background:#1a1a28;border-radius:4px;height:6px;overflow:hidden;">
-      <div style="background:#e05c2a;height:100%;width:{pct:.0f}%;border-radius:4px;"></div>
-    </div>"""
+def pbar(val, mx=5.0):
+    pct = val / mx * 100
+    return f'<div class="pbar-wrap"><div class="pbar-fill" style="width:{pct:.0f}%"></div></div>'
 
 def plotly_dark():
     return dict(
-        plot_bgcolor="#0d0d16",
-        paper_bgcolor="#12121c",
-        font=dict(color="#c8c4bc", family="DM Sans"),
-        xaxis=dict(gridcolor="#1e1e2e", linecolor="#1e1e2e"),
-        yaxis=dict(gridcolor="#1e1e2e", linecolor="#1e1e2e"),
-        margin=dict(l=16, r=16, t=32, b=16),
+        plot_bgcolor="#0c0c18", paper_bgcolor="#10101e",
+        font=dict(color="#a0a0b8", family="DM Sans"),
+        xaxis=dict(gridcolor="#181828", linecolor="#181828"),
+        yaxis=dict(gridcolor="#181828", linecolor="#181828"),
+        margin=dict(l=12, r=12, t=28, b=12),
     )
 
-# ─────────────────────────────────────────────
+def watch_button(title: str, size: str = "normal") -> str:
+    """Génère un lien JustWatch → si non trouvé, YouTube trailer."""
+    q = quote(title)
+    justwatch_url = f"https://www.justwatch.com/fr/recherche?q={q}"
+    youtube_url   = f"https://www.youtube.com/results?search_query={q}+trailer+official"
+    cls = "watch-btn" if size == "normal" else "watch-btn-sm"
+    # Lien principal JustWatch + lien alternatif YouTube
+    return (
+        f'<a href="{justwatch_url}" target="_blank" class="{cls}">▶ Regarder</a>'
+        f'&nbsp;<a href="{youtube_url}" target="_blank" class="watch-btn-sm">🎞 Trailer</a>'
+    )
+
+ratings_df, movies_df = load_data()
+MOVIE_TITLES  = movies_df.set_index("movieId")["title"].to_dict()
+MOVIE_GENRES  = movies_df.set_index("movieId")["genres"].to_dict()
+ALL_MOVIE_IDS = movies_df["movieId"].tolist()
+
+if "seen_ratings"    not in st.session_state: st.session_state.seen_ratings    = {}
+if "recommendations" not in st.session_state: st.session_state.recommendations = []
+
+
+# ─────────────────────────────────────────────────────────
 # SIDEBAR
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('<div class="logo-banner">🎬 Cine<span class="logo-accent">Match</span></div>', unsafe_allow_html=True)
-    st.markdown('<div style="color:#4a4a5c;font-size:0.75rem;margin-bottom:24px;">Item-Item Collaborative Filtering</div>', unsafe_allow_html=True)
+    st.markdown('<div class="logo">🎬 Cine<span class="logo-dot">Match</span></div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:.72rem;color:#30305a;margin-bottom:20px;">Item-Item Collaborative Filtering · TP1</div>', unsafe_allow_html=True)
 
-    st.markdown("### ⚙️ Paramètres du modèle")
-    k_neighbors = st.slider("Voisins k (top-k items similaires)", min_value=5, max_value=50, value=20, step=5)
-    n_reco = st.slider("Top-N recommandations", min_value=5, max_value=20, value=10, step=1)
+    st.markdown("### ⚙️ Paramètres")
+    k_neighbors = st.slider("Voisins k", 5, 40, 20, 5)
+    n_reco      = st.slider("Top-N recommandations", 5, 20, 8)
 
-    st.markdown("---")
-    st.markdown("### 🔍 Navigation")
-    page = st.radio(
-        "Page",
-        ["🏠 Accueil", "🔮 Prédiction de note", "🎯 Top-N Recommandations", "🔗 Similarité entre films"],
-        label_visibility="collapsed",
-    )
-
-    st.markdown("---")
-    ratings_df, movies_df = load_data()
     model = load_model(k_neighbors)
-    sparsity = model.get_sparsity()
+    stats = model.get_global_stats()
 
+    st.markdown("---")
     st.markdown("### 📊 Dataset")
-    col1, col2 = st.columns(2)
-    col1.metric("Users", ratings_df["userId"].nunique())
-    col2.metric("Films", movies_df.shape[0])
-    col1.metric("Notes", len(ratings_df))
-    col2.metric("Sparsité", f"{sparsity*100:.1f}%")
+    c1, c2 = st.columns(2)
+    c1.metric("Users",   stats["n_users"])
+    c2.metric("Films",   stats["n_movies"])
+    c1.metric("Notes",   f"{stats['n_ratings']:,}")
+    c2.metric("Sparsité",f"{stats['sparsity']*100:.1f}%")
 
-    st.markdown('<span class="info-pill">MovieLens · Cosine Similarity</span>', unsafe_allow_html=True)
+    st.markdown("---")
+    seen_count = len(st.session_state.seen_ratings)
+    st.markdown(f"### 🎬 Mon profil · {seen_count} film{'s' if seen_count!=1 else ''}")
+    if st.session_state.seen_ratings:
+        avg_my = np.mean(list(st.session_state.seen_ratings.values()))
+        st.markdown(f'<div style="color:#d4501e;font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;">{avg_my:.1f} ★</div><div style="color:#50507a;font-size:.75rem;">moyenne de mes notes</div>', unsafe_allow_html=True)
+        if st.button("🗑️ Réinitialiser le profil"):
+            st.session_state.seen_ratings    = {}
+            st.session_state.recommendations = []
+            st.rerun()
 
-# ─────────────────────────────────────────────
-# PAGE : ACCUEIL
-# ─────────────────────────────────────────────
-if page == "🏠 Accueil":
+    st.markdown("---")
+    st.markdown('<span style="font-size:.7rem;color:#303050;">150 films réels · MovieLens-style · Cosine Similarity</span>', unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────
+# TABS
+# ─────────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs(["🎬 Mon Profil", "✨ Recommandations", "🔗 Similarité"])
+
+
+# ═════════════════════════════════════════════════════════
+# TAB 1 — PROFIL UTILISATEUR
+# ═════════════════════════════════════════════════════════
+with tab1:
     st.markdown("""
-    <div class="page-header">
-      <p class="page-title">Système de Recommandation<br>Item-Item Collaboratif</p>
-      <p class="page-sub">TP1 · MovieLens · Cosine Similarity · Filtrage collaboratif</p>
-    </div>
-    """, unsafe_allow_html=True)
+    <div class="ph">
+      <div class="ph-title">🎬 Construis ton profil cinéma</div>
+      <div class="ph-sub">Ajoute les films que tu as vus, donne ta note — le système apprend tes goûts</div>
+    </div>""", unsafe_allow_html=True)
 
-    # Metrics row
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f'<div class="metric-box"><div class="metric-val">{ratings_df["userId"].nunique()}</div><div class="metric-label">Utilisateurs</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-box"><div class="metric-val">{movies_df.shape[0]}</div><div class="metric-label">Films</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-box"><div class="metric-val">{len(ratings_df):,}</div><div class="metric-label">Notes</div></div>', unsafe_allow_html=True)
-    with c4:
-        avg = ratings_df["rating"].mean()
-        st.markdown(f'<div class="metric-box"><div class="metric-val">{avg:.2f}</div><div class="metric-label">Note moyenne</div></div>', unsafe_allow_html=True)
+    left, right = st.columns([1.1, 1], gap="large")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    col_a, col_b = st.columns([1.2, 1])
-
-    with col_a:
+    # ── Catalogue ───────────────────────────────────────
+    with left:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("#### 📐 Comment ça marche ?")
-        st.markdown("""
-Le **filtrage collaboratif item-item** (Sarwar et al., 2001) prédit la note
-qu'un utilisateur donnerait à un film, en se basant sur la ressemblance entre films.
+        st.markdown("#### 🔍 Catalogue")
 
-**Étapes :**
-1. **Matrice utilisateur-item** — chaque cellule = note donnée
-2. **Centrage** — soustraction de la moyenne de chaque utilisateur
-3. **Similarité cosinus** entre toutes les paires de films
-4. **Prédiction** via agrégation pondérée des k voisins les plus proches
-""")
-        st.latex(r"\hat{r}_{u,i} = \bar{r}_u + \frac{\sum_{j \in N_k(i)} \text{sim}(i,j)\cdot(r_{u,j} - \bar{r}_u)}{\sum_{j \in N_k(i)} |\text{sim}(i,j)|}")
+        search = st.text_input("Rechercher…", placeholder="Inception, Dune, Parasite…", label_visibility="collapsed")
+        all_genres = sorted({g for gs in MOVIE_GENRES.values() for g in gs.split("|")})
+        genre_filter = st.selectbox("Genre", ["Tous les genres"] + all_genres, label_visibility="collapsed")
+
+        filtered = movies_df.copy()
+        if search:
+            filtered = filtered[filtered["title"].str.contains(search, case=False, na=False)]
+        if genre_filter != "Tous les genres":
+            filtered = filtered[filtered["genres"].str.contains(genre_filter, na=False)]
+        filtered = filtered[~filtered["movieId"].isin(st.session_state.seen_ratings.keys())]
+        filtered = filtered.head(25)
+
+        st.markdown(f'<div style="color:#50507a;font-size:.75rem;margin-bottom:10px;">{len(filtered)} résultats</div>', unsafe_allow_html=True)
+
+        for _, row in filtered.iterrows():
+            mid   = int(row["movieId"])
+            title = row["title"]
+            c1, c2, c3 = st.columns([4, 2, 1])
+            with c1:
+                st.markdown(f"""
+                <div class="film-chip">
+                  <div class="chip-title">{title}</div>
+                  <div class="chip-genre">{row['genres'].replace('|',' · ')}</div>
+                </div>""", unsafe_allow_html=True)
+            with c2:
+                # Bouton regarder directement depuis le catalogue
+                st.markdown(watch_button(title, "sm"), unsafe_allow_html=True)
+            with c3:
+                if st.button("➕", key=f"add_{mid}", help="Ajouter à mes films vus"):
+                    st.session_state.seen_ratings[mid] = 3.5
+                    st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_b:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("#### 📊 Distribution des notes")
-        dist = ratings_df["rating"].value_counts().sort_index()
-        fig = go.Figure(go.Bar(
-            x=dist.index.astype(str),
-            y=dist.values,
-            marker_color="#e05c2a",
-            marker_line_width=0,
-        ))
-        fig.update_layout(**plotly_dark(), height=220, showlegend=False)
-        fig.update_xaxes(title="Note")
-        fig.update_yaxes(title="Nombre")
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
+    # ── Films vus + notation ────────────────────────────
+    with right:
+        st.markdown('<div class="card card-hot">', unsafe_allow_html=True)
+        st.markdown("#### ✅ Films vus — ma notation")
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### 🏆 Films les mieux notés (≥ 10 avis)")
-    film_stats = ratings_df.groupby("movieId").agg(
-        mean_rating=("rating", "mean"),
-        n_ratings=("rating", "count"),
-    ).reset_index()
-    film_stats = film_stats[film_stats["n_ratings"] >= 10].sort_values("mean_rating", ascending=False).head(10)
-    film_stats = film_stats.merge(movies_df, on="movieId")
-
-    for _, row in film_stats.iterrows():
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            st.markdown(f"**{row['title']}**")
-            st.markdown(genre_tags(row['genres']), unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<div class="stars">{stars(row["mean_rating"])}</div>', unsafe_allow_html=True)
-        with col3:
-            st.markdown(f'<span style="color:#e05c2a;font-weight:700;">{row["mean_rating"]:.2f}</span> / 5', unsafe_allow_html=True)
-        st.markdown(rating_bar(row["mean_rating"]), unsafe_allow_html=True)
-        st.markdown("<hr style='margin:6px 0;border-color:#1a1a28;'>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# PAGE : PRÉDICTION
-# ─────────────────────────────────────────────
-elif page == "🔮 Prédiction de note":
-    st.markdown("""
-    <div class="page-header">
-      <p class="page-title">🔮 Prédiction de Note</p>
-      <p class="page-sub">Estimation de la note qu'un utilisateur donnerait à un film non encore vu</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    all_users = model.get_all_users()
-    all_movies = model.get_all_movies()
-
-    col_l, col_r = st.columns([1, 1])
-
-    with col_l:
-        st.markdown('<div class="card card-accent">', unsafe_allow_html=True)
-        st.markdown("#### Sélection")
-        user_id = st.selectbox("👤 Utilisateur", all_users, format_func=lambda x: f"Utilisateur #{x}")
-        movie_options = all_movies["movieId"].tolist()
-        movie_titles = all_movies.set_index("movieId")["title"].to_dict()
-        movie_id = st.selectbox("🎬 Film", movie_options, format_func=lambda x: movie_titles.get(x, f"Film #{x}"))
-        predict_btn = st.button("Prédire la note →")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Stats utilisateur
-        stats = model.get_user_stats(user_id)
-        if stats:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"#### 👤 Profil — Utilisateur #{user_id}")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Notes données", stats["n_ratings"])
-            m2.metric("Moyenne", stats["mean_rating"])
-            m3.metric("Max", stats["max_rating"])
-
-            st.markdown("**Derniers films notés :**")
-            top_rated = stats["rated_movies"].head(5)
-            for mid, r in top_rated.items():
-                t = movie_titles.get(mid, f"Film #{mid}")
-                st.markdown(f'<div class="neighbor-row"><span class="neighbor-title">{t[:40]}</span><span class="neighbor-rating">{r:.1f} ★</span></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_r:
-        if predict_btn or "last_pred" in st.session_state:
-            if predict_btn:
-                result = model.predict_rating(user_id, movie_id)
-                st.session_state["last_pred"] = (user_id, movie_id, result)
-            else:
-                user_id, movie_id, result = st.session_state["last_pred"]
-
-            movie_info = all_movies[all_movies["movieId"] == movie_id].iloc[0]
-            movie_stats = model.get_movie_stats(movie_id)
-
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"#### 🎬 {movie_info['title']}")
-            st.markdown(genre_tags(movie_info['genres']), unsafe_allow_html=True)
-            st.markdown(f"<br><small style='color:#6a6a7c;'>Noté par {movie_stats.get('n_ratings',0)} utilisateurs · Moyenne globale {movie_stats.get('mean_rating',0):.2f}/5</small>", unsafe_allow_html=True)
-            st.markdown("---")
-
-            if "error" in result:
-                st.error(result["error"])
-            else:
-                pred = result["prediction"]
-                col_score, col_star = st.columns([1, 1])
-                with col_score:
-                    st.markdown(f'<div class="pred-score">{pred}</div><div style="color:#6a6a7c;font-size:0.85rem;margin-top:4px;">/ 5.0 prédit</div>', unsafe_allow_html=True)
-                with col_star:
-                    st.markdown(f'<div class="stars" style="font-size:1.8rem;margin-top:12px;">{stars(pred)}</div>', unsafe_allow_html=True)
+        if not st.session_state.seen_ratings:
+            st.markdown("""
+            <div style="text-align:center;padding:40px 10px;color:#404060;">
+              <div style="font-size:2.5rem;margin-bottom:10px;">👈</div>
+              <div>Ajoute des films depuis le catalogue<br>pour construire ton profil</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            to_remove = []
+            for mid, rating in list(st.session_state.seen_ratings.items()):
+                title  = MOVIE_TITLES.get(mid, f"Film #{mid}")
+                genres = MOVIE_GENRES.get(mid, "")
 
                 st.markdown(f"""
-                <div style="background:#1a1a28;border-radius:8px;padding:12px 16px;margin-top:16px;font-size:0.84rem;color:#9090a8;">
-                  Méthode : Item-Item CF · Voisins utilisés : <b style="color:#e05c2a;">{result['n_neighbors']}</b> · 
-                  Moyenne utilisateur : <b style="color:#e05c2a;">{result['user_mean']}</b>
+                <div style="margin-bottom:2px;">
+                  <div style="font-size:.85rem;color:#d0ccc8;font-weight:500;">{title}</div>
+                  <div style="font-size:.68rem;color:#404060;">{genres.replace('|',' · ')}</div>
                 </div>""", unsafe_allow_html=True)
 
-            st.markdown('</div>', unsafe_allow_html=True)
+                col_star, col_watch, col_rm = st.columns([4, 2, 1])
+                with col_star:
+                    new_r = st.select_slider(
+                        "Note", options=[1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0],
+                        value=rating, format_func=lambda x: f"{x} ★",
+                        key=f"rate_{mid}", label_visibility="collapsed",
+                    )
+                    st.session_state.seen_ratings[mid] = new_r
+                with col_watch:
+                    st.markdown(watch_button(title, "sm"), unsafe_allow_html=True)
+                with col_rm:
+                    if st.button("✕", key=f"rm_{mid}"):
+                        to_remove.append(mid)
 
-            if "error" not in result and result["neighbors"]:
-                st.markdown('<div class="card">', unsafe_allow_html=True)
-                st.markdown(f"#### 🔗 {len(result['neighbors'])} films voisins utilisés")
-                st.markdown('<div style="color:#6a6a7c;font-size:0.8rem;margin-bottom:12px;">Films similaires que l\'utilisateur a déjà notés</div>', unsafe_allow_html=True)
+                st.markdown("<hr style='margin:8px 0;border-color:#181828;'>", unsafe_allow_html=True)
 
-                for i, n in enumerate(result["neighbors"], 1):
-                    sim_pct = int(n["similarity"] * 100)
-                    st.markdown(f"""
-                    <div class="neighbor-row">
-                      <span class="neighbor-rank">#{i}</span>
-                      <span class="neighbor-title">{n['title'][:42]}</span>
-                      <span style="font-size:0.75rem;color:#5a5a7c;width:70px;text-align:center;">sim {n['similarity']:.3f}</span>
-                      <span class="neighbor-rating">{n['user_rating']} ★</span>
-                    </div>""", unsafe_allow_html=True)
+            for mid in to_remove:
+                del st.session_state.seen_ratings[mid]
+            if to_remove:
+                st.rerun()
 
-                # Mini bar chart similarités
-                nb_df = pd.DataFrame(result["neighbors"]).head(8)
-                fig = go.Figure(go.Bar(
-                    x=nb_df["similarity"],
-                    y=[t[:28] + "…" if len(t) > 28 else t for t in nb_df["title"]],
-                    orientation="h",
-                    marker_color="#e05c2a",
-                    marker_line_width=0,
-                ))
-                fig.update_layout(**plotly_dark(), height=260, showlegend=False)
-                fig.update_xaxes(title="Similarité cosinus", range=[0, 1])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="card" style="text-align:center;padding:60px 20px;">
-              <div style="font-size:3rem;margin-bottom:12px;">🔮</div>
-              <div style="color:#6a6a7c;">Sélectionne un utilisateur et un film,<br>puis clique sur <b style="color:#e05c2a;">Prédire la note</b></div>
-            </div>""", unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# PAGE : TOP-N RECOMMANDATIONS
-# ─────────────────────────────────────────────
-elif page == "🎯 Top-N Recommandations":
-    st.markdown("""
-    <div class="page-header">
-      <p class="page-title">🎯 Top-N Recommandations</p>
-      <p class="page-sub">Films suggérés pour un utilisateur, qu'il n'a pas encore vus</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    all_users = model.get_all_users()
-    all_movies = model.get_all_movies()
-    movie_titles = all_movies.set_index("movieId")["title"].to_dict()
-
-    col_ctrl, col_res = st.columns([1, 2])
-
-    with col_ctrl:
-        st.markdown('<div class="card card-accent">', unsafe_allow_html=True)
-        user_id = st.selectbox("👤 Utilisateur", all_users, format_func=lambda x: f"Utilisateur #{x}", key="topn_user")
-        reco_btn = st.button(f"Générer Top-{n_reco} →")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        stats = model.get_user_stats(user_id)
-        if stats:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"#### 👤 Utilisateur #{user_id}")
-            m1, m2 = st.columns(2)
-            m1.metric("Films notés", stats["n_ratings"])
-            m2.metric("Moyenne", stats["mean_rating"])
-            st.markdown("**Films préférés :**")
-            for mid, r in stats["rated_movies"].head(4).items():
-                t = movie_titles.get(mid, f"#{mid}")
-                st.markdown(f'<div class="neighbor-row"><span class="neighbor-title">{t[:34]}</span><span class="neighbor-rating">{r:.1f} ★</span></div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_res:
-        if reco_btn or f"reco_{user_id}" in st.session_state:
-            if reco_btn:
-                recs = model.recommend_top_n(user_id, n=n_reco)
-                st.session_state[f"reco_{user_id}"] = recs
-            else:
-                recs = st.session_state[f"reco_{user_id}"]
-
-            if recs.empty:
-                st.warning("Pas assez de données pour cet utilisateur.")
-            else:
-                # Bar chart
-                fig = go.Figure(go.Bar(
-                    x=recs["predicted_rating"],
-                    y=[t[:35] + "…" if len(t) > 35 else t for t in recs["title"]],
-                    orientation="h",
-                    marker=dict(
-                        color=recs["predicted_rating"],
-                        colorscale=[[0, "#1e1e2e"], [1, "#e05c2a"]],
-                        showscale=False,
-                        line_width=0,
-                    ),
-                    text=[f"{r:.2f}" for r in recs["predicted_rating"]],
-                    textposition="outside",
-                    textfont=dict(color="#e05c2a", size=11),
-                ))
-                fig.update_layout(**plotly_dark(), height=max(300, n_reco * 36), showlegend=False)
-                fig.update_xaxes(title="Note prédite", range=[0, 5.3])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-                # Table détaillée
-                st.markdown('<div class="card">', unsafe_allow_html=True)
-                st.markdown(f"#### 📋 Détail des {len(recs)} recommandations")
-                for i, row in recs.iterrows():
-                    c1, c2, c3 = st.columns([3, 2, 1])
-                    with c1:
-                        st.markdown(f"**{i+1}. {row['title']}**")
-                        st.markdown(genre_tags(row['genres']), unsafe_allow_html=True)
-                    with c2:
-                        st.markdown(f'<div class="stars">{stars(row["predicted_rating"])}</div>', unsafe_allow_html=True)
-                        st.markdown(rating_bar(row["predicted_rating"]), unsafe_allow_html=True)
-                    with c3:
-                        st.markdown(f'<span style="color:#e05c2a;font-family:Syne,sans-serif;font-weight:700;font-size:1.1rem;">{row["predicted_rating"]:.2f}</span>', unsafe_allow_html=True)
-                        st.caption(f"{row['n_neighbors']} voisins")
-                    if i < len(recs) - 1:
-                        st.markdown("<hr style='margin:6px 0;border-color:#1a1a28;'>", unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="card" style="text-align:center;padding:60px 20px;">
-              <div style="font-size:3rem;margin-bottom:12px;">🎯</div>
-              <div style="color:#6a6a7c;">Sélectionne un utilisateur et clique sur<br><b style="color:#e05c2a;">Générer les recommandations</b></div>
-            </div>""", unsafe_allow_html=True)
+        if len(st.session_state.seen_ratings) >= 2:
+            if st.button(f"✨ Générer mes {n_reco} recommandations →", use_container_width=True):
+                with st.spinner("Calcul en cours…"):
+                    recs = model.predict_for_user_profile(st.session_state.seen_ratings, n=n_reco)
+                    st.session_state.recommendations = recs
+                st.success(f"✅ {len(recs)} recommandations prêtes ! Consulte l'onglet ✨")
+        elif st.session_state.seen_ratings:
+            st.info("Ajoute au moins 2 films pour générer des recommandations.")
 
 
-# ─────────────────────────────────────────────
-# PAGE : SIMILARITÉ
-# ─────────────────────────────────────────────
-elif page == "🔗 Similarité entre films":
+# ═════════════════════════════════════════════════════════
+# TAB 2 — RECOMMANDATIONS
+# ═════════════════════════════════════════════════════════
+with tab2:
     st.markdown("""
-    <div class="page-header">
-      <p class="page-title">🔗 Similarité entre Films</p>
-      <p class="page-sub">Matrice de similarité cosinus item-item et films les plus proches</p>
-    </div>
-    """, unsafe_allow_html=True)
+    <div class="ph">
+      <div class="ph-title">✨ Recommandations personnalisées</div>
+      <div class="ph-sub">Films prédits selon tes goûts · Explication item-item + sociale · Liens pour regarder</div>
+    </div>""", unsafe_allow_html=True)
 
-    all_movies = model.get_all_movies()
-    movie_titles = all_movies.set_index("movieId")["title"].to_dict()
+    recs = st.session_state.recommendations
 
-    tab1, tab2 = st.tabs(["🔍 Films similaires", "🗺️ Heatmap de similarité"])
+    if not recs:
+        st.markdown("""
+        <div class="card" style="text-align:center;padding:60px 20px;">
+          <div style="font-size:3rem;margin-bottom:12px;">✨</div>
+          <div style="color:#50507a;">Note au moins 2 films dans <b style="color:#d4501e;">Mon Profil</b>,<br>puis clique sur <b style="color:#d4501e;">Générer mes recommandations</b></div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        # Métriques
+        avg_pred = np.mean([r["predicted_rating"] for r in recs])
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div class="mbox"><div class="mval">{len(recs)}</div><div class="mlbl">Recommandations</div></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="mbox"><div class="mval">{avg_pred:.2f}</div><div class="mlbl">Note prédite moy.</div></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="mbox"><div class="mval">{len(st.session_state.seen_ratings)}</div><div class="mlbl">Films dans mon profil</div></div>', unsafe_allow_html=True)
 
-    with tab1:
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Bar chart
+        titles_short = [r["title"][:34] + "…" if len(r["title"]) > 34 else r["title"] for r in recs]
+        preds = [r["predicted_rating"] for r in recs]
+        fig = go.Figure(go.Bar(
+            x=preds, y=titles_short, orientation="h",
+            marker=dict(
+                color=preds,
+                colorscale=[[0,"#1a1a2e"],[1,"#d4501e"]],
+                showscale=False, line_width=0,
+            ),
+            text=[f"{p:.2f} ★" for p in preds],
+            textposition="outside",
+            textfont=dict(color="#d4501e", size=11),
+        ))
+        fig.update_layout(**plotly_dark(), height=max(280, len(recs)*38), showlegend=False)
+        fig.update_xaxes(title="Note prédite", range=[0,5.6])
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+        st.markdown("### 📋 Détail & Explications")
+
+        for i, rec in enumerate(recs):
+            pred = rec["predicted_rating"]
+            fire = "🔥" if pred >= 4.2 else ""
+
+            with st.expander(f"#{i+1}  {rec['title']}  ·  {pred} ★  {fire}"):
+                col_info, col_score = st.columns([3, 1])
+
+                with col_info:
+                    st.markdown(genre_tags(rec["genres"]), unsafe_allow_html=True)
+                    st.markdown(f'<div style="color:#60607a;font-size:.78rem;margin-top:6px;">{rec["n_neighbors"]} films voisins utilisés</div>', unsafe_allow_html=True)
+                    # ── Bouton Regarder bien visible ──────
+                    st.markdown(f'<div style="margin-top:10px;">{watch_button(rec["title"])}</div>', unsafe_allow_html=True)
+
+                with col_score:
+                    st.markdown(f'<div class="reco-score">{pred}</div><div style="font-size:.75rem;color:#60607a;">/ 5.0 prédit</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="stars" style="font-size:1.1rem;">{stars(pred)}</div>', unsafe_allow_html=True)
+
+                # ── Explication Item-Item ─────────────────
+                if rec.get("explanation_item"):
+                    st.markdown(f"""
+                    <div class="expl-box">
+                      <div class="expl-label">🎬 Pourquoi ? — Similarité item-item</div>
+                      {rec["explanation_item"]}
+                    </div>""", unsafe_allow_html=True)
+
+                    if rec.get("top_similar_seen"):
+                        st.markdown('<div style="margin-top:10px;margin-bottom:4px;font-size:.75rem;color:#50507a;text-transform:uppercase;letter-spacing:.08em;">Films similaires que tu as notés</div>', unsafe_allow_html=True)
+                        for nb in rec["top_similar_seen"]:
+                            sentiment = "❤️" if nb["your_rating"] >= 4 else ("👍" if nb["your_rating"] >= 3 else "😐")
+                            st.markdown(f"""
+                            <div class="nb-row">
+                              <span>{sentiment}</span>
+                              <span class="nb-title">{nb['title']}</span>
+                              <span class="nb-sim">sim {nb['similarity']:.3f}</span>
+                              <span class="nb-rat">{nb['your_rating']} ★</span>
+                            </div>""", unsafe_allow_html=True)
+                            st.markdown(pbar(nb["similarity"], 1.0), unsafe_allow_html=True)
+
+                # ── Explication Sociale ───────────────────
+                if rec.get("explanation_user"):
+                    st.markdown(f"""
+                    <div class="expl-box" style="border-color:#3a3a10;margin-top:10px;">
+                      <div class="expl-label" style="color:#a09010;">👥 Pourquoi ? — Utilisateurs similaires</div>
+                      {rec["explanation_user"]}
+                    </div>""", unsafe_allow_html=True)
+
+                    if rec.get("similar_users_info"):
+                        st.markdown('<div style="margin-top:10px;font-size:.75rem;color:#50507a;text-transform:uppercase;letter-spacing:.08em;">Utilisateurs similaires</div>', unsafe_allow_html=True)
+                        for u in rec["similar_users_info"][:4]:
+                            st.markdown(f"""
+                            <div class="nb-row">
+                              <span class="nb-title">User #{u['userId']} · {u['n_common']} films en commun</span>
+                              <span class="nb-sim">sim {u['similarity']:.2f}</span>
+                              <span class="nb-rat">{u['their_rating']} ★</span>
+                            </div>""", unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════════════════
+# TAB 3 — SIMILARITÉ
+# ═════════════════════════════════════════════════════════
+with tab3:
+    st.markdown("""
+    <div class="ph">
+      <div class="ph-title">🔗 Similarité entre films</div>
+      <div class="ph-sub">Matrice de similarité cosinus item-item — base du système de recommandation</div>
+    </div>""", unsafe_allow_html=True)
+
+    sub1, sub2 = st.tabs(["🔍 Films similaires", "🗺️ Heatmap"])
+
+    with sub1:
         col_l, col_r = st.columns([1, 1.4])
-
         with col_l:
-            st.markdown('<div class="card card-accent">', unsafe_allow_html=True)
-            movie_id = st.selectbox(
-                "🎬 Film de référence",
-                all_movies["movieId"].tolist(),
-                format_func=lambda x: movie_titles.get(x, f"Film #{x}"),
-                key="sim_movie"
+            st.markdown('<div class="card card-hot">', unsafe_allow_html=True)
+            movie_id_sim = st.selectbox(
+                "Film de référence", ALL_MOVIE_IDS,
+                format_func=lambda x: MOVIE_TITLES.get(x, f"Film #{x}"),
             )
             n_sim = st.slider("Nombre de voisins", 5, 20, 10)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            movie_info = all_movies[all_movies["movieId"] == movie_id].iloc[0]
+            mrow = movies_df[movies_df["movieId"] == movie_id_sim].iloc[0]
             st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown(f"#### 🎬 {movie_info['title']}")
-            st.markdown(genre_tags(movie_info['genres']), unsafe_allow_html=True)
-            mstats = model.get_movie_stats(movie_id)
-            st.markdown(f"<br><b>{mstats.get('n_ratings',0)}</b> notes · Moyenne <b style='color:#e05c2a;'>{mstats.get('mean_rating',0):.2f}/5</b> · σ = {mstats.get('std_rating',0):.2f}", unsafe_allow_html=True)
+            st.markdown(f"**{mrow['title']}**")
+            st.markdown(genre_tags(mrow['genres']), unsafe_allow_html=True)
+            rc = ratings_df[ratings_df["movieId"] == movie_id_sim]["rating"]
+            if len(rc):
+                st.markdown(f"<br><span style='color:#d4501e;font-weight:700;font-family:Syne,sans-serif;'>{rc.mean():.2f} ★</span> <span style='color:#50507a;font-size:.8rem;'>· {len(rc)} avis</span>", unsafe_allow_html=True)
+            st.markdown(f'<div style="margin-top:10px;">{watch_button(mrow["title"])}</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with col_r:
-            similar = model.get_similar_items(movie_id, n=n_sim)
-            if not similar.empty:
-                # Bar chart
+            sim_df = model.get_similar_items(movie_id_sim, n=n_sim)
+            if not sim_df.empty:
                 fig = go.Figure(go.Bar(
-                    x=similar["similarity"],
-                    y=[t[:32] + "…" if len(t) > 32 else t for t in similar["title"]],
+                    x=sim_df["similarity"],
+                    y=[t[:30]+"…" if len(t)>30 else t for t in sim_df["title"]],
                     orientation="h",
                     marker=dict(
-                        color=similar["similarity"],
-                        colorscale=[[0, "#1e1e30"], [1, "#e05c2a"]],
+                        color=sim_df["similarity"],
+                        colorscale=[[0,"#141428"],[1,"#d4501e"]],
                         showscale=True,
-                        colorbar=dict(title="Similarité", tickfont=dict(color="#9090a8"), titlefont=dict(color="#9090a8")),
+                        colorbar=dict(
+                            title=dict(text="Sim.", font=dict(color="#8080a0")),
+                            tickfont=dict(color="#8080a0"),
+                        ),
                         line_width=0,
                     ),
-                    text=[f"{s:.3f}" for s in similar["similarity"]],
+                    text=[f"{s:.3f}" for s in sim_df["similarity"]],
                     textposition="outside",
-                    textfont=dict(color="#e05c2a", size=10),
+                    textfont=dict(color="#d4501e", size=10),
                 ))
-                fig.update_layout(**plotly_dark(), height=max(320, n_sim * 36), showlegend=False)
-                fig.update_xaxes(title="Similarité cosinus", range=[0, 1.1])
+                fig.update_layout(**plotly_dark(), height=max(320, n_sim*36), showlegend=False)
+                fig.update_xaxes(title="Similarité cosinus", range=[0, 1.12])
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-                st.markdown('<div class="card">', unsafe_allow_html=True)
-                st.markdown(f"#### Films les plus proches de *{movie_info['title']}*")
-                for _, row in similar.iterrows():
-                    c1, c2, c3 = st.columns([3, 2, 1])
+                for _, row in sim_df.iterrows():
+                    c1, c2, c3, c4 = st.columns([3, 2, 1, 2])
                     with c1:
                         st.markdown(f"**{row['title']}**")
                         st.markdown(genre_tags(row['genres']), unsafe_allow_html=True)
                     with c2:
-                        st.markdown(rating_bar(row["similarity"]), unsafe_allow_html=True)
+                        st.markdown(pbar(row["similarity"], 1.0), unsafe_allow_html=True)
                     with c3:
-                        st.markdown(f'<span style="color:#e05c2a;font-weight:700;">{row["similarity"]:.3f}</span>', unsafe_allow_html=True)
-                    st.markdown("<hr style='margin:5px 0;border-color:#1a1a28;'>", unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                        st.markdown(f'<span style="color:#d4501e;font-family:Syne,sans-serif;font-weight:700;">{row["similarity"]:.3f}</span>', unsafe_allow_html=True)
+                    with c4:
+                        st.markdown(watch_button(row["title"], "sm"), unsafe_allow_html=True)
+                    st.markdown("<hr style='margin:5px 0;border-color:#181828;'>", unsafe_allow_html=True)
 
-    with tab2:
+    with sub2:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("#### Sélectionne des films pour visualiser leur matrice de similarité")
+        st.markdown("#### Heatmap — sélectionne jusqu'à 15 films")
 
-        top_movies = ratings_df = load_data()[0]
-        top_ids = top_movies.groupby("movieId").size().nlargest(30).index.tolist()
-        top_titles = [movie_titles.get(m, f"#{m}") for m in top_ids]
+        top_ids    = ratings_df.groupby("movieId").size().nlargest(30).index.tolist()
+        top_titles = [MOVIE_TITLES.get(m, f"#{m}") for m in top_ids]
+        title_to_id = {MOVIE_TITLES.get(m): m for m in top_ids}
 
-        selected_titles = st.multiselect(
-            "Films à inclure (max 15)",
-            options=top_titles,
-            default=top_titles[:10],
-            max_selections=15,
-        )
+        selected = st.multiselect("Films", top_titles, default=top_titles[:10], max_selections=15, label_visibility="collapsed")
 
-        if len(selected_titles) >= 2:
-            title_to_id = {v: k for k, v in movie_titles.items()}
-            selected_ids = [title_to_id[t] for t in selected_titles if t in title_to_id]
-
-            submat = model.get_similarity_submatrix(selected_ids)
-
+        if len(selected) >= 2:
+            sel_ids = [title_to_id[t] for t in selected if t in title_to_id]
+            submat  = model.get_similarity_submatrix(sel_ids)
+            short   = [c[:20]+"…" if len(c)>20 else c for c in submat.columns]
             fig = go.Figure(go.Heatmap(
-                z=submat.values,
-                x=[t[:20] + "…" if len(t) > 20 else t for t in submat.columns],
-                y=[t[:20] + "…" if len(t) > 20 else t for t in submat.index],
-                colorscale=[[0, "#0a0a0f"], [0.5, "#2a1a0f"], [1, "#e05c2a"]],
+                z=submat.values, x=short, y=short,
+                colorscale=[[0,"#080810"],[0.5,"#2a1a08"],[1,"#d4501e"]],
                 zmin=0, zmax=1,
                 text=np.round(submat.values, 2),
                 texttemplate="%{text}",
                 textfont=dict(size=9, color="white"),
-                hoverongaps=False,
                 colorbar=dict(
-                    title="Similarité",
-                    tickfont=dict(color="#9090a8"),
-                    titlefont=dict(color="#9090a8"),
+                    title=dict(text="Sim.", font=dict(color="#8080a0")),
+                    tickfont=dict(color="#8080a0"),
                 ),
             ))
-            fig.update_layout(
-                **plotly_dark(),
-                height=500,
-                xaxis=dict(tickangle=-40, tickfont=dict(size=10)),
-                yaxis=dict(tickfont=dict(size=10)),
-            )
+            _hl = plotly_dark()
+            _hl['height'] = 500
+            _hl['xaxis'] = dict(gridcolor='#181828', linecolor='#181828', tickangle=-38, tickfont=dict(size=9))
+            _hl['yaxis'] = dict(gridcolor='#181828', linecolor='#181828', tickfont=dict(size=9))
+            fig.update_layout(**_hl)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         else:
             st.info("Sélectionne au moins 2 films.")
