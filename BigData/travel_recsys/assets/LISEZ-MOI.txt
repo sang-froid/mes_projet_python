@@ -1,0 +1,59 @@
+# 📁 Assets à télécharger — WanderMatch
+
+Dépose tes fichiers dans les dossiers indiqués en respectant EXACTEMENT les noms de fichiers.
+Les formats acceptés : JPG, PNG, WEBP pour les images · MP3, OGG, WAV pour le son.
+
+───────────────────────────────────────────────────────────
+## 🖼️ assets/images/destinations/
+Images des 30 destinations (renommées exactement comme ci-dessous)
+Taille recommandée : 800×500 px minimum
+
+  dest_1.jpg     → Bali (Indonésie)
+  dest_2.jpg     → Thaïlande
+  dest_3.jpg     → Japon
+  dest_4.jpg     → Islande (aurores boréales)
+  dest_5.jpg     → Norvège (fjords)
+  dest_6.jpg     → Vietnam
+  dest_7.jpg     → Maroc
+  dest_8.jpg     → Grèce (Santorin)
+  dest_9.jpg     → Portugal (Lisbonne)
+  dest_10.jpg    → Mexique
+  dest_11.jpg    → Pérou (Machu Picchu)
+  dest_12.jpg    → Costa Rica
+  dest_13.jpg    → Maldives
+  dest_14.jpg    → Tanzanie (safari)
+  dest_15.jpg    → Islande (glaciers)
+  dest_16.jpg    → Nouvelle-Zélande
+  dest_17.jpg    → Australie
+  dest_18.jpg    → Émirats Arabes Unis (Dubaï)
+  dest_19.jpg    → Italie
+  dest_20.jpg    → Espagne
+  dest_21.jpg    → France (Paris)
+  dest_22.jpg    → Suisse
+  dest_23.jpg    → Écosse
+  dest_24.jpg    → Canada (Banff)
+  dest_25.jpg    → Inde (Rajasthan)
+  dest_26.jpg    → Cambodge (Angkor Vat)
+  dest_27.jpg    → Sri Lanka
+  dest_28.jpg    → Jordanie (Pétra)
+  dest_29.jpg    → Colombie
+  dest_30.jpg    → Cuba
+
+───────────────────────────────────────────────────────────
+## 🖼️ assets/images/heroes/
+3 grandes images de fond pour les pages (1600×900 px minimum)
+
+  hero_explorer.jpg    → Grande photo paysage (montagne, mer, nature…)
+  hero_recs.jpg        → Photo voyage / avion / carte du monde
+  hero_sim.jpg         → Photo destination iconique
+
+───────────────────────────────────────────────────────────
+## 🎵 assets/sounds/
+  ambient.mp3    → Musique d'ambiance (lofi, jazz, ambient…)
+                   Durée recommandée : 3-5 min, loop
+
+───────────────────────────────────────────────────────────
+## 💡 Conseils
+- Télécharge des images libres sur : https://unsplash.com · https://pexels.com · https://pixabay.com
+- Si un fichier est manquant, l'app affiche un placeholder gris (pas de crash)
+- Tu peux aussi utiliser .png ou .webp — change juste l'extension dans le nom du fichier
